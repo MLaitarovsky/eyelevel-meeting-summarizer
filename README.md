@@ -41,6 +41,15 @@ npm run dev
 
 Open <http://localhost:5173>. Drop an audio file. Wait ~10–40s. Read the cards. Click **Download as Word** to export.
 
+### Smoke test
+
+```bash
+cd backend
+uv run pytest -q
+```
+
+One test that hits the real Anthropic API to confirm `analyze()` returns at least one decision and one action item from a tiny English transcript. Auto-skips if `ANTHROPIC_API_KEY` is unset. Whisper is not exercised — see `CLAUDE.md` for why the test surface is intentionally narrow.
+
 ## Architecture
 
 ```
@@ -76,6 +85,7 @@ The whole pipeline is one synchronous request. State lives in the request lifecy
 - **25 MB upload limit** — Whisper's hard cap. Validated client-side (with a friendly error) and server-side.
 - **120-minute duration limit** — defensive guard for very low-bitrate audio that slips under the size limit.
 - **No diarization** — Whisper doesn't reliably label speakers, so the prompt extracts speakers from conversational cues only and reports per-participant confidence.
+- **Hebrew loanword transcription** — Whisper occasionally swaps Hebrew near-homophones (e.g., `לדחות` → `לדחוץ`) and confuses borrowed English nouns (e.g., `הדדליין` → `הבדליין`). The structured analysis stays correct because Claude reasons over surrounding context, but individual transcript words can be wrong. See `PROCESS.md` for why this was documented rather than masked with a Claude correction pass.
 - **Single-user, single-session** — uploads aren't persisted. Refresh the page and the result is gone.
 
 ## Deliverables
