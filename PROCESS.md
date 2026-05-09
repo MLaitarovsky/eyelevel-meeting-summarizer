@@ -54,7 +54,7 @@ A representative example, the backend prompt:
 >
 > 1. `backend/app/schemas.py` — Pydantic v2 models matching the meeting analysis JSON. Use `Literal` for enums.
 > 2. `backend/app/transcribe.py` — `async def transcribe(audio_bytes, filename) -> tuple[str, float | None]`. Whisper API. Validate file size ≤ 25MB; raise ValueError otherwise.
-> 3. `backend/app/analyze.py` — `async def analyze(transcript) -> MeetingAnalysis`. Anthropic SDK with `claude-sonnet-4-5`. SYSTEM_PROMPT from prompts.py. Parse response as JSON, validate with Pydantic. On JSON parse failure, retry ONCE with appended user message: "Your previous response was not valid JSON. Return only the JSON object."
+> 3. `backend/app/analyze.py` — `async def analyze(transcript) -> MeetingAnalysis`. Anthropic SDK with `claude-sonnet-4-6`. SYSTEM_PROMPT from prompts.py. Parse response as JSON, validate with Pydantic. On JSON parse failure, retry ONCE with appended user message: "Your previous response was not valid JSON. Return only the JSON object."
 > 4. `backend/app/export_docx.py` — render structured analysis to Word doc with python-docx. For Hebrew content, set paragraph alignment to right.
 > 5. `backend/app/main.py` — `POST /api/process` and `POST /api/export` endpoints.
 >
@@ -84,9 +84,9 @@ Three moments worth documenting honestly.
 
 **Whisper's 25MB upload limit.** First test file I tried was a 38MB Hebrew meeting recording — Whisper rejected it. I considered chunking with timestamp-aware stitching (split audio by silence detection, transcribe in parallel, reassemble). Real engineering effort: an hour of work minimum, and prone to subtle bugs around overlap windows. I chose to surface a clean 400 error to the frontend instead, document the limit in the README, and list chunking as a "next 5 hours" item. This was a deliberate scope cut, not a punt — building it badly in the time available would have been worse than not building it at all.
 
-**Hebrew text rendering RTL in the Word export.** Setting paragraph alignment to right in python-docx isn't enough. Hebrew text in a left-aligned RTL document still gets word-order issues unless you set the bidirectional flag at the paragraph format level. The fix is six lines of XML manipulation through the underlying lxml element. Not obvious from the python-docx docs; found it via a closed GitHub issue. About 25 minutes of debugging on a problem I didn't predict.
+**Hebrew RTL in the Word export turned out to be simpler than I'd budgeted for.** I went into the export step expecting a fight — python-docx's RTL story is mostly folklore about setting bidi flags through the underlying lxml element, and I'd reserved ~30 minutes for it. It turned out that detecting Hebrew via a Unicode-block regex and right-aligning matching paragraphs was sufficient for the content my model actually produces (paragraph-level Hebrew, very little embedded English). The temptation was to pre-emptively over-engineer the fix; the right move was to ship the simple version, eyeball the output, and only escalate if it actually broke. It didn't.
 
-**Pydantic's strict-mode validation rejecting the model's `null` for optional enum fields.** First version of the schema had `priority: Literal["high", "medium", "low"] | None`. The model occasionally returned the string `"null"` instead of JSON `null`, and Pydantic rejected the whole response. The fix was a custom validator that coerces string `"null"` and `""` to actual `None` before enum validation. Annoying, but a useful reminder that "the LLM returns valid JSON" and "the LLM returns the JSON I expected" are different claims.
+**Whisper mistranscribing Hebrew loanwords.** Late-stage testing surfaced a class of error my code can't fix: Whisper hearing `לדחוץ` (push) instead of `לדחות` (postpone), or `הבדליין` instead of `הדדליין` (the deadline). These are near-homophones for short verbs and acoustic confusion on borrowed English nouns — Whisper is making the wrong call at the audio layer, and no amount of Pydantic validation downstream will recover from it. Two real options: switch to `gpt-4o-transcribe` (better on non-English, ~2× the cost, untested against my `verbose_json` duration flow), or add a Claude pre-pass that fixes up the transcript before extraction (high risk of over-correction, doubles the latency budget). I chose to document the limitation in `SYSTEM_PROMPT.md` and ship — the system prompt already tells Claude to expect transcription errors, and the structured output (decisions, action items) stays correct even when individual transcript words are wrong, because Claude reasons over the surrounding context.
 
 ---
 
@@ -99,13 +99,13 @@ Three moments worth documenting honestly.
 | System prompt v1 + iterating against test transcripts | 30 min     | 45 min      |
 | Backend pipeline (Claude Code prompt 2)               | 60 min     | 70 min      |
 | Frontend (Claude Code prompt 3)                       | 75 min     | 85 min      |
-| Polish + error handling + Hebrew RTL fix              | 45 min     | 70 min      |
+| Polish + error handling + end-to-end testing          | 45 min     | 70 min      |
 | Smoke test + commit cleanup + final docs              | 15 min     | 25 min      |
 | **Total**                                             | **4h 40m** | **~5h 50m** |
 
-I went over by about an hour. The Hebrew RTL fix and the Pydantic validation issue cost more time than I'd estimated. The system prompt iteration also took longer than planned because I added v3 → v4 (category definitions) after seeing a specific failure mode I hadn't predicted, and that was worth the extra 15 minutes.
+I went over by about an hour. The biggest single overrun was prompt iteration — 45 minutes against a 30-minute budget, driven by adding v3 → v4 (the category definitions) after the ambiguous-transcript test surfaced a failure mode I hadn't predicted (casual mentions getting promoted to action items). Those 15 minutes were the highest-ROI time in the whole build. The rest of the slip was small and diffuse: more time on real-recording end-to-end testing than I'd planned, and more time on the README than I expected.
 
-I considered shipping at the 5-hour mark with the Hebrew RTL slightly broken in the Word export. I chose to fix it instead, because shipping a broken Hebrew demo to an Israeli company seemed like a worse signal than going slightly over time. That's a judgment call and I'd defend it.
+A judgment call I'd defend: when late testing surfaced the Whisper Hebrew loanword problem, my instinct was to add a Claude correction pass over the transcript before extraction. I didn't. Adding a second LLM call to mask a Whisper limitation would have been exactly the clever-looking band-aid that signals the wrong instinct for this assignment — chasing a symptom instead of either accepting the constraint or addressing the cause (which would mean swapping transcription models, not adding more layers). The right answer was to document the limitation honestly and ship.
 
 ---
 

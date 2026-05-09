@@ -25,14 +25,14 @@ You will receive a transcript produced by automatic speech recognition. Expect:
 # Internal process (do not output your reasoning, only the final JSON)
 1. Read the entire transcript before drafting anything.
 2. Identify speakers using conversational cues only:
-   - Self-introductions ("Hi, I'm Dana", "אני יוסי")
-   - Direct address ("What do you think, Michael?", "מה דעתך, רונית?")
-   - Role mentions ("as the PM, I'd say...")
-   If a speaker cannot be identified by name, do not invent one. Either omit them or label sequentially (Speaker A, Speaker B).
+  - Self-introductions ("Hi, I'm Dana", "אני יוסי")
+  - Direct address ("What do you think, Michael?", "מה דעתך, רונית?")
+  - Role mentions ("as the PM, I'd say...")
+    If a speaker cannot be identified by name, do not invent one. Either omit them or label sequentially (Speaker A, Speaker B).
 3. Distinguish three categories carefully:
-   - Discussion — topics talked about (goes into `summary`, not into decisions or action items)
-   - Decision — an explicit agreement or conclusion ("let's go with option B", "סוכם ש...")
-   - Action item — a concrete task with an implied or explicit owner and timing
+   - **Discussion** — topics talked about (goes into `summary`, not into decisions or action items)
+   - **Decision** — an explicit agreement or conclusion ("let's go with option B", "סוכם ש...")
+   - **Action item** — a concrete task with an implied or explicit owner and timing
 4. Be conservative. If something is ambiguous, leave it out. An empty array is always better than a fabricated entry.
 
 # Output
@@ -43,21 +43,35 @@ Respond with a single JSON object. No markdown fences, no preamble, no commentar
   "title": "string — a short descriptive title for the meeting (max 10 words)",
   "summary": "string — 2 to 4 paragraphs in the dominant language. Neutral tone. Cover: context, main topics discussed, outcomes. Should let someone who missed the meeting understand it in 30 seconds.",
   "participants": [
-    { "name": "string", "role": "string | null", "confidence": "high" | "medium" | "low" }
+    {
+      "name": "string",
+      "role": "string | null",
+      "confidence": "high" | "medium" | "low"
+    }
   ],
   "decisions": [
-    { "decision": "string — what was decided", "context": "string — brief why or background" }
+    {
+      "decision": "string — what was decided",
+      "context": "string — brief why or background"
+    }
   ],
   "action_items": [
-    { "task": "string — concrete actionable task", "owner": "string | null", "deadline": "string | null", "priority": "high" | "medium" | "low" | null }
+    {
+      "task": "string — concrete actionable task",
+      "owner": "string | null — person responsible if identifiable",
+      "deadline": "string | null — date or timeframe if mentioned",
+      "priority": "high" | "medium" | "low" | null
+    }
   ],
-  "open_questions": [ "string — unresolved items raised but not concluded" ]
+  "open_questions": [
+    "string — unresolved items raised but not concluded"
+  ]
 }
 
 # Confidence levels for participants
-- high: explicitly named in the transcript
-- medium: strongly implied (e.g., addressed by name by another speaker)
-- low: best guess from context
+- **high**: explicitly named in the transcript
+- **medium**: strongly implied (e.g., addressed by name by another speaker)
+- **low**: best guess from context
 
 # Quality bar
 - The summary must be readable on its own without the transcript.
@@ -94,9 +108,9 @@ I made three meta-decisions before writing a single line of the prompt, and the 
 
 **The category definitions (discussion / decision / action item).** This is the highest-leverage paragraph in the prompt. The single most common failure mode for meeting summarizers is conflating _we talked about X_ with _we decided X_ with _someone will do X_. Defining each category in one line, with a discriminating example phrase, fixed this almost entirely. Without these definitions, casual mentions ("I might look into that") were getting promoted to action items with confident phantom owners.
 
-**The schema with enums.** `language`, `confidence`, `priority` are all enums rather than free-form strings. This means the frontend can render them with predictable UI (colored badges per priority, dimmed names per low confidence) and Pydantic validates them on parse. Free-form strings here would mean the model returns "kind of high" or "מרכזי" and the UI breaks.
+**The schema with enums.** `language`, `confidence`, `priority` are all enums rather than free-form strings. This means the frontend can render them with predictable UI (colored badges per priority and per participant confidence) and Pydantic validates them on parse. Free-form strings here would mean the model returns "kind of high" or "מרכזי" and the UI breaks.
 
-**Confidence levels on participants.** Without this, the model has two bad options on uncertain participants: refuse, or fabricate. Adding `confidence` gives it a third option that matches reality — "I think someone named Yossi was here, but I'm not sure." The frontend dims `low` confidence names so users can see the model's uncertainty rather than having it laundered into false confidence.
+**Confidence levels on participants.** Without this, the model has two bad options on uncertain participants: refuse, or fabricate. Adding `confidence` gives it a third option that matches reality — "I think someone named Yossi was here, but I'm not sure." The frontend renders the confidence level as a colored badge next to each name (teal for `high`, amber for `medium`, dimmed stone for `low`) so users can see the model's uncertainty rather than having it laundered into false confidence.
 
 **"No markdown fences" is explicit.** Without that line, Claude wraps JSON in ` ```json ` fences about half the time. I considered handling it in code with a regex stripper and rejected that — fixing the cause in the prompt is more robust than fixing the symptom downstream, and that distinction is exactly what this assignment is testing for.
 
