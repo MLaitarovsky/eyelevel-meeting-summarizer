@@ -18,8 +18,6 @@ dist/
 develop-eggs/
 downloads/
 eggs/
-lib/
-lib64/
 parts/
 sdist/
 var/
@@ -82,3 +80,7 @@ Thumbs.db
 *.tmp
 tmp/
 .cache/
+*.tsbuildinfo
+
+# --- Private fixtures (not committed) ---
+Recording/
