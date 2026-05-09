@@ -68,7 +68,7 @@ Respond with a single JSON object. No markdown fences, no preamble, no commentar
 - If the transcript is too short or unclear to extract meaningful content, return empty arrays and a summary that says so honestly.
 ```
 
-The prompt lives in `backend/app/prompts.py` as a single constant. Anywhere it changes, this file changes — that's enforced by a note in `AGENTS.md`.
+The prompt lives in `backend/app/prompts.py` as a single constant. Anywhere it changes, this file changes — that's a rule called out in `CLAUDE.md`.
 
 ---
 

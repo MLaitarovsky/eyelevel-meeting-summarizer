@@ -36,7 +36,9 @@ I used Claude Code as the primary coding agent inside the IDE, with the Anthropi
 
 ### Repo-level setup
 
-I dropped a `CLAUDE.md` and an `AGENTS.md` at the repo root before running any build prompts. `CLAUDE.md` is the project context (stack, decisions made, what _not_ to add). `AGENTS.md` is the cross-vendor working agreement (commit conventions, common commands, out-of-scope rules). With both in place, Claude Code stopped suggesting things I'd already decided against — no more "shall I add a database for persistence?" mid-build.
+I dropped a `CLAUDE.md` and an `AGENTS.md` at the repo root before running any build prompts. `CLAUDE.md` is the project context (stack, decisions made, what _not_ to add). `AGENTS.md` was a cross-vendor working agreement (commit conventions, common commands, out-of-scope rules). With both in place, Claude Code stopped suggesting things I'd already decided against — no more "shall I add a database for persistence?" mid-build.
+
+Late in the build I deleted `AGENTS.md` and folded the still-relevant rules into `CLAUDE.md`. With only one AI agent actually touching this repo, two overlapping context files were ceremony rather than signal — the same anti-pattern I call out below for subagents and skills.
 
 I considered adding `.claude/agents/` subagents and `.claude/skills/` skills as well. I rejected both. Subagents earn their keep on long-lived projects with recurring specialized workflows; skills earn theirs when a complex procedure repeats with assets. Neither fits a single-flow, take-home-scoped build. Adding them anyway would be exactly the "looks-professional ceremony" anti-pattern this assignment is testing for.
 
