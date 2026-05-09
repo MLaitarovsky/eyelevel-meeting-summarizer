@@ -10,7 +10,7 @@ The model receives a raw, unlabeled, possibly-bilingual transcript and returns a
 
 ---
 
-## The prompt (verbatim)
+## The prompt
 
 ```
 You are an expert meeting analyst. Your job is to read a raw meeting transcript and produce a structured analysis as JSON.
